@@ -5,25 +5,65 @@ const port = 3001;
 
 const docker = new Docker({socketPath: '/var/run/docker.sock'});
 
-// Array of Docker containers
-const containers = ['container1', 'container2', 'container3'];
-
-app.post('/', (req, res) => {
+app.post('/', async (req, res) => {
   let restartErrors = [];
-  containers.forEach((containerName) => {
-    const container = docker.getContainer(containerName);
-    container.restart((err) => {
-      if (err) {
-        console.error(`Error restarting container ${containerName}: ${err}`);
-        restartErrors.push(containerName);
-      }
-    });
-  });
 
-  if (restartErrors.length === 0) {
-    res.status(200).send('All containers restarted successfully');
-  } else {
-    res.status(500).send(`Failed to restart containers: ${restartErrors.join(', ')}`);
+  try {
+    let containers = await docker.listContainers({ all: true });
+    
+    let vroomContainer = containers.find(container => container.Names.some(name => name.includes('vroom')));
+    let valhallaContainer = containers.find(container => container.Names.some(name => name.includes('valhalla')));
+
+    if (!vroomContainer) {
+      res.status(404).send('No container with a name containing "vroom" found');
+      return;
+    }
+
+    if (!valhallaContainer) {
+      res.status(404).send('No container with a name containing "valhalla" found');
+      return;
+    }
+
+    console.log(`About to restart container with ID: ${vroomContainer.Id}`);
+    const vroomContainerInstance = docker.getContainer(vroomContainer.Id);
+      
+    await new Promise((resolve, reject) => {
+      vroomContainerInstance.restart((err) => {
+        if (err) {
+          console.error(`Error restarting container ${vroomContainer.Id}: ${err}`);
+          restartErrors.push(vroomContainer.Id);
+          reject(err);
+        } else {
+          console.log(`Container with ID: ${vroomContainer.Id} restarted successfully`);
+          setTimeout(resolve, 5000); // wait for 5 seconds
+        }
+      });
+    });
+
+    console.log(`About to restart container with ID: ${valhallaContainer.Id}`);
+    const valhallaContainerInstance = docker.getContainer(valhallaContainer.Id);
+
+    await new Promise((resolve, reject) => {
+      valhallaContainerInstance.restart((err) => {
+        if (err) {
+          console.error(`Error restarting container ${valhallaContainer.Id}: ${err}`);
+          restartErrors.push(valhallaContainer.Id);
+          reject(err);
+        } else {
+          console.log(`Container with ID: ${valhallaContainer.Id} restarted successfully`);
+          setTimeout(resolve, 5000); // wait for 5 seconds
+        }
+      });
+    });
+
+    if (restartErrors.length === 0) {
+      res.status(200).send('All containers restarted successfully');
+    } else {
+      res.status(500).send(`Failed to restart containers: ${restartErrors.join(', ')}`);
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error listing containers');
   }
 });
 

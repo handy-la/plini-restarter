@@ -1,5 +1,5 @@
 # Build Docker image
-docker build -t my-nodejs-app .
+docker build -t plini-restarter .
 
 # Run Docker container
-docker run -p 3001:3001 -d my-nodejs-app
+docker run -p 3001:3001 -d plini-restarter
